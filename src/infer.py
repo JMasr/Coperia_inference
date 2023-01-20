@@ -36,12 +36,10 @@ def inference(model_path: str, file_list: str, output_path: str,
     FE = FeatureExtractor(feature_config['default'])
 
     # Loop over all files
+    scores = {}
     file_list = open(file_list).readlines()
     file_list = [line.strip().split() for line in file_list]
-    scores = {}
-
     for fileId, path in file_list:
-
         # Prepare features
         try:
             F = FE.extract(path)
@@ -71,6 +69,7 @@ def inference(model_path: str, file_list: str, output_path: str,
         scores[fileId] = sum(output)[0].item() / len(output)
 
     # Write output scores
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, 'w') as f:
         for item in scores:
             f.write(item + " " + str(scores[item]) + "\n")
