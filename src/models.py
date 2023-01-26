@@ -2,15 +2,21 @@ import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence, pad_packed_sequence, pack_padded_sequence
 
+from sklearn.linear_model import LogisticRegression
+from sklearn.neural_network import MLPClassifier
+from sklearn.ensemble import RandomForestClassifier
+
 
 # %%
 def getNet(arch):
-    ''' getNet()
-	Function used to fetch an architecture
-	TODO: Update the dictionary for new architectures
-	Raises an error if the architecture is not found.
-	'''
-    architectures = {'LSTMClassifier': LSTMClassifier}
+    """ getNet()
+    Function used to fetch an architecture. Raises an error if the architecture is not found.
+    """
+    architectures = {'LSTMClassifier': LSTMClassifier,
+                     'linearSVM': LogisticRegression,
+                     'MLP': MLPClassifier,
+                     'RandomForest': RandomForestClassifier}
+
     architecture = architectures.get(arch, None)
     if architecture:
         return architecture
@@ -18,13 +24,13 @@ def getNet(arch):
         raise ValueError('Architecture not found. If already defined, add it to architectures dictionary in models.py')
 
 
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# %% Torch utils
 def activations(act):
-    '''
-	Interface to fetch activations
-	'''
-    activations = {'Tanh': nn.Tanh(), 'ReLU': nn.ReLU(), 'Sigmoid': nn.Sigmoid()}
-    act = activations[act]
+    """
+    Interface to fetch activations
+    """
+    activ = {'Tanh': nn.Tanh(), 'ReLU': nn.ReLU(), 'Sigmoid': nn.Sigmoid()}
+    act = activ[act]
 
     if act is not None:
         return act
@@ -33,10 +39,10 @@ def activations(act):
 
 
 class bce_loss(nn.Module):
-    '''
-	Class interface to compute BCE loss
-	Default uses mean reduction equal weight for both positive and negative samples
-	'''
+    """
+    Class interface to compute BCE loss
+    Default uses mean reduction equal weight for both positive and negative samples
+    """
 
     def __init__(self, reduction='mean', pos_weight=torch.tensor([1])):
         super(bce_loss, self).__init__()
@@ -73,25 +79,25 @@ class FFClassificationHead(nn.Module):
             x = self.activation(x)
             x = getattr(self, 'dropout_' + str(i))(x)
         x = self.linearOut(x)
-        return [x[i,] for i in range(x.shape[0])]
+        return [x[i, ] for i in range(x.shape[0])]
 
 
-# %%
+# %% LSTM ENCODER classifier
 class LSTMEncoder(nn.Module):
-    ''' Stacked (B)LSTM Encoder
-	Arguments:
-	args: Dictionary with below entries
-	input_dimenstion: (integer), Dimension of the feature vector input
-	units: (integer), Number of LSTM units. Default: 128
-	num_layers: (integer), Number of layers in the stacked LSTM. Default: 2
-	bidirectional: (bool), if True biLSTM will be used. Default: True
-	apply_mean_norm: (bool), subtract the example level mean. Default: False
-	apply_var_norm: (bool), normalize by standard deviation. Default: False 
-	pooltype: (['average' or 'last']). Default: 'average'
-	----> 'average': average of the LSTM output along time dimension is the embedding
- 	----> 'last': LSTM hidden state at the last time-step of the last layer is the embedding	
-	dropout: (float), Dropout probability. Default: 0
-	'''
+    """ Stacked (B)LSTM Encoder
+    Arguments:
+    args: Dictionary with below entries
+    input_dimenstion: (integer), Dimension of the feature vector input
+    units: (integer), Number of LSTM units. Default: 128
+    num_layers: (integer), Number of layers in the stacked LSTM. Default: 2
+    bidirectional: (bool), if True biLSTM will be used. Default: True
+    apply_mean_norm: (bool), subtract the example level mean. Default: False
+    apply_var_norm: (bool), normalize by standard deviation. Default: False
+    pooltype: (['average' or 'last']). Default: 'average'
+    ----> 'average': average of the LSTM output along time dimension is the embedding
+    ----> 'last': LSTM hidden state at the last time-step of the last layer is the embedding
+    dropout: (float), Dropout probability. Default: 0
+    """
 
     def __init__(self, args):
         super(LSTMEncoder, self).__init__()
@@ -116,10 +122,10 @@ class LSTMEncoder(nn.Module):
                             dropout=self.dropout_p)
 
     def forward(self, inputs):
-        '''
-		inputs: a list of torch tensors
-		The tensors can be of varying length.
-		'''
+        """
+        inputs: a list of torch tensors
+        The tensors can be of varying length.
+        """
         inlens = [x.shape[0] for x in inputs]
         if self.apply_mean_norm:
             inputs = [F - torch.mean(F, dim=0) for F in inputs]
@@ -145,12 +151,11 @@ class LSTMEncoder(nn.Module):
         return [x[i, :].view(1, x.shape[1]) for i in range(x.shape[0])]
 
 
-# %%
+# %% LSTM classifier
 class LSTMClassifier(nn.Module):
-    '''
-	LSTM Classifier architecture
-	
-	'''
+    """
+    LSTM Classifier architecture
+    """
 
     def __init__(self, args):
         super(LSTMClassifier, self).__init__()
@@ -186,31 +191,79 @@ class LSTMClassifier(nn.Module):
         self.criterion = bce_loss()
 
     def init_encoder(self, params):
-        '''
-		Initialize the feature encoder using a pre-trained model
-		'''
+        """
+        Initialize the feature encoder using a pre-trained model
+        """
         self.encoder.load_state_dict(params)
 
     def init_classifier(self, params):
-        '''
-		Initialize the classification-head using a pre-trained classifier model
-		'''
+        """
+        Initialize the classification-head using a pre-trained classifier model
+        """
         self.classifier.load_state_dict(params)
 
     def predict(self, inputs):
-        '''
-		Prediction of the classifier score
-		'''
+        """
+        Prediction of the classifier score
+        """
         return self.classifier(self.encoder(inputs))
 
     def predict_proba(self, inputs):
-        '''
-		Prediction of the posterior probability
-		'''
+        """
+        Prediction of the posterior probability
+        """
         return [torch.sigmoid(item) for item in self.predict(inputs)]
 
     def forward(self, inputs, targets):
-        '''
-		Forward pass through the network and loss computation
-		'''
+        """
+        Forward pass through the network and loss computation
+        """
         return self.criterion(torch.stack(self.predict(inputs)), torch.stack(targets))
+
+
+# %% Sklearn Models
+class sklearnModel:
+    # parent class with training and forward pass methods
+    def __init__(self):
+        self.classifier = None
+
+    def run_fit(self, x_train, y_train):
+        self.classifier.fit(x_train, y_train)
+        return
+
+    def validate(self, x_val):
+        y_scores = []
+        for item in x_val:
+            y_scores.append(self.classifier.predict_proba(item))
+        return y_scores
+
+
+# %% Logistic regression
+class LR(sklearnModel):
+    def __init__(self, model_args):
+        super().__init__()
+        self.classifier = LogisticRegression(C=float(model_args['c']), max_iter=int(model_args['max_iter']),
+                                             solver=model_args['solver'], penalty=model_args['penalty'],
+                                             class_weight=model_args['class_weight'],
+                                             random_state=model_args['random_state'])
+
+
+# %% Random forest
+class RF(sklearnModel):
+    def __init__(self, model_args):
+        super().__init__()
+        self.classifier = RandomForestClassifier(n_estimators=int(model_args['n_estimators']),
+                                                 class_weight=model_args['class_weight'],
+                                                 random_state=model_args['random_state'])
+
+
+# %% Multi-layer perceptron
+class MLP(sklearnModel):
+    def __init__(self, model_args):
+        super().__init__()
+        self.classifier = MLPClassifier(hidden_layer_sizes=model_args['hidden_layer_sizes'],
+                                        solver=model_args['solver'], alpha=model_args['alpha'],
+                                        learning_rate_init=model_args['learning_rate_init'],
+                                        verbose=model_args['verbose'], activation=model_args['activation'],
+                                        max_iter=int(model_args['max_iter']), random_state=model_args['random_state'])
+# %%
