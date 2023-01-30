@@ -8,8 +8,9 @@ Modified pn Mon Feb 08 13:21:00 2021
 """
 
 import argparse
-import numpy as np
 import pickle
+
+import numpy as np
 from sklearn.metrics import auc
 
 
@@ -59,15 +60,19 @@ def score(reference_labels, sys_scores, thresholds=np.arange(0, 1, 0.0001)):
     return AUC, TPR, TNR
 
 
-def scoring(refs, sys_outs, out_file=None, specificities_chosen=[0.5, 0.95]):
+def scoring(refs, sys_outs, out_file=None, specificities_chosen=None):
     """
     inputs::
     refs: a txt file with a list of labels for each wav-fileid in the format: <id> <label>
-    sys_outs: a txt file with a list of scores (probability of being covid positive) for each wav-fileid in the format: <id> <score>
+    sys_outs: a txt file with a list of scores (probability of being covid positive)
+     for each wav-fileid in the format: <id> <score>
     out_file (optional): name of the output file
     specificities_chosen: optionally mention the specificities at which sensitivity is reported    
         
     """
+
+    if specificities_chosen is None:
+        specificities_chosen = [0.5, 0.95]
 
     thresholds = np.arange(0, 1, 0.0001)
     # Read the ground truth labels into a dictionary
@@ -94,11 +99,9 @@ def scoring(refs, sys_outs, out_file=None, specificities_chosen=[0.5, 0.95]):
     # %%
 
     AUC, TPR, TNR = score(reference_labels, sys_scores, thresholds=thresholds)
-    print(AUC)
 
     specificities = []
     sensitivities = []
-
     decision_thresholds = []
     for specificity_threshold in specificities_chosen:
         ind = np.where(TNR > specificity_threshold)[0]
@@ -117,13 +120,14 @@ def scoring(refs, sys_outs, out_file=None, specificities_chosen=[0.5, 0.95]):
               'operatingPts': decision_thresholds,
               'thresholds': thresholds}
 
-    if out_file != None:
-        with open(out_file, "wb") as f: pickle.dump(scores, f)
-        with open(out_file.replace('.pkl', '.summary'), 'w') as f: f.write(
-            "AUC {:.3f}\t Sens. {:.3f}\tSpec. {:.3f}\tSens. {:.3f}\tSpec. {:.3f}\n".format(AUC, sensitivities[0],
-                                                                                           specificities[0],
-                                                                                           sensitivities[1],
-                                                                                           specificities[1]))
+    if out_file is not None:
+        with open(out_file, "wb") as f:
+            pickle.dump(scores, f)
+        with open(out_file.replace('.pkl', '.summary'), 'w') as f:
+            pretty_score = "AUC {:.3f}\t Sens. {:.3f}\tSpec. {:.3f}\tSens. {:.3f}\tSpec. {:.3f}\n"\
+                .format(AUC, sensitivities[0], specificities[0], sensitivities[1], specificities[1])
+            f.write(pretty_score)
+            print(pretty_score)
     return scores
 
 
