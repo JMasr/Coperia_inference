@@ -14,7 +14,7 @@ if __name__ == '__main__':
     parser.add_argument('--scores_path', '-s', default='results/wav_test_scores.txt')     # Path to an output .txt file with the results
     parser.add_argument('--model_path', '-p', default='models/breathing-deep/models/final.pt')  # Path to model .ptl
     parser.add_argument('--model_config', '-m', default='config/model_config')  # Path to model's configuration
-    parser.add_argument('--inference_config', '-c', default='config/train_config')  # Path to inference's configuration
+    parser.add_argument('--inference_config', '-c', default='config/infer_config')  # Path to inference's configuration
     parser.add_argument('--feature_config', '-f', default='config/feature_config')  # Path to feature's configuration
     # Load scoring arguments
     parser.add_argument('--ref_file', '-r', default='data/reference')  # Path to the reference file with the labels

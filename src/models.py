@@ -1,3 +1,5 @@
+import pickle
+
 import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence, pad_packed_sequence, pack_padded_sequence
@@ -8,18 +10,25 @@ from sklearn.ensemble import RandomForestClassifier
 
 
 # %%
-def getNet(arch):
+def getNet(model_args: dict):
     """ getNet()
     Function used to fetch an architecture. Raises an error if the architecture is not found.
     """
-    architectures = {'LSTMClassifier': LSTMClassifier,
-                     'linearSVM': LogisticRegression,
-                     'MLP': MLPClassifier,
-                     'RandomForest': RandomForestClassifier}
+    architectures = {'lstmclassifier': LSTMClassifier,
+                     'linearsvm': LogisticRegression,
+                     'mlp': MLPClassifier,
+                     'randomforest': RandomForestClassifier}
 
-    architecture = architectures.get(arch, None)
-    if architecture:
-        return architecture
+    architecture = model_args['architecture'].lower()
+    if architecture in 'lstmclassifier':
+        model = architectures.get(architecture, None)(model_args)
+        model.load_state_dict(torch.load(model_args['model_path'], map_location='cpu'))
+        model = model.to(torch.device('cpu'))
+        model.eval()
+        return model
+    elif architecture in architectures.keys():
+        model = pickle.load(open(model_args['model_path'], 'rb'))
+        return model
     else:
         raise ValueError('Architecture not found. If already defined, add it to architectures dictionary in models.py')
 
