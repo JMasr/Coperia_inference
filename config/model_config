@@ -1,5 +1,6 @@
 [default]
 architecture = LSTMClassifier
+model_path = models/coswara_model_by_tasks/results_blstm/breathing-deep/models/final.pt
 
 apply_mean_norm = False
 apply_var_norm = False
