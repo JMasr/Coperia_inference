@@ -48,6 +48,16 @@ def read_label_and_score_files(label_file: str, score_file: str) -> dict:
     return sys_out
 
 
+def filter_labels(system_output: dict, labels: list) -> dict:
+    """
+    Filter the dictionary to include only the labels of interest
+    :param system_output: dictionary of labels and scores
+    :param labels: list with the labels of interest
+    :return: a dictionary of labels and scores
+    """
+    return {k: v for k, v in system_output.items() if k in labels}
+
+
 def score_sklearn(out_file, system_output):
     """
     Calculate the performance metrics using sklearn
