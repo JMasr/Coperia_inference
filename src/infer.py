@@ -1,8 +1,42 @@
-from src.utils import *
 from src.models import *
+from src.utils import *
 
 from tqdm import tqdm
 from configparser import ConfigParser
+
+
+def getNet(model_config: ConfigParser):
+    """
+    Interface to fetch model
+    :param model_config: model configuration
+    :return: model
+    """
+    architectures = {'logisticregression': LogisticRegression, 'randomforest': RandomForestClassifier,
+                     'mlp': MLPClassifier, 'blstm': LSTMClassifier}
+
+    # Load model parameters
+    model_args = {}
+    if model_config is not None:
+        for key in model_config['default'].keys():
+            model_args[key] = convert_type(model_config['default'][key])
+
+        architecture = model_args['architecture']
+        for key in model_config[architecture].keys():
+            model_args[key] = convert_type(model_config[architecture][key])
+    else:
+        raise ValueError('Expected an architecture')
+
+    if architecture.lower() in 'blstm':
+        model = architectures.get(architecture, None)(model_args)
+        model.load_state_dict(torch.load(model_args['model_path'], map_location='cpu'))
+        model = model.to(torch.device('cpu'))
+        model.eval()
+        return model
+    elif architecture.lower() in architectures.keys():
+        model = pickle.load(open(model_args['model_path'], 'rb'))
+        return model
+    else:
+        raise ValueError('Architecture not found.')
 
 
 def inference(file_list: str, output_path: str,
@@ -18,16 +52,8 @@ def inference(file_list: str, output_path: str,
     :param feature_config: Configuration of the feature extractor
     :return: A list of id -> labels with a probability score
     """
-    # Load model parameters
-    model_args = {}
-    if model_config is not None:
-        for key in model_config['default'].keys():
-            model_args[key] = convert_type(model_config['default'][key])
-    else:
-        raise ValueError('Expected an architecture')
-
     # Load model, use CPU for inference
-    model = getNet(model_args)
+    model = getNet(model_config)
 
     # Feature extractor
     FE = FeatureExtractor(feature_config['default'])
@@ -61,7 +87,7 @@ def inference(file_list: str, output_path: str,
         else:
             raise ValueError('Unknown eval model')
 
-        if model_args['architecture'].lower() == 'lstmclassifier':
+        if model_config['default'].get('architecture').lower() == 'lstmclassifier':
             with torch.no_grad():
                 output_score = model.predict_proba(feat)
                 output_score = sum(output_score)[0].item() / len(output_score)
@@ -85,7 +111,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--file_list', '-i', required=True)  # Path to a .scp file
     parser.add_argument('--output_path', '-o', required=True)  # Path to an output .txt file with the results
-    parser.add_argument('--model_config', '-m', default='config/model_config')  # Path to model's configuration
+    parser.add_argument('--model_path', '-m', default='models/breathing-deep/models/final.pt')  # Path to model .ptl
     parser.add_argument('--inference_config', '-c', default='config/infer_config')  # Path to inference's configuration
     parser.add_argument('--feature_config', '-f', default='config/feature_config')  # Path to featur's configuration
 
