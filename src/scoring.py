@@ -12,11 +12,10 @@ Edited on 2022
 This script is used to calculate the performance metrics for the covid-19 and long-covid detection task.
 """
 
-import argparse
 import pickle
-from typing import Any
-
+import argparse
 import numpy as np
+
 from matplotlib import pyplot as plt
 from sklearn.metrics import roc_auc_score, roc_curve, precision_recall_fscore_support, f1_score, confusion_matrix, \
     precision_recall_curve
@@ -114,8 +113,10 @@ def score_sklearn(out_file, system_output):
         plt.savefig(out_file.replace('.pkl', '_precision_recall.png'))
         plt.close()
 
+        # Display the confusion matrix
+        disp = ConfusionMatrixDisplay(confusion_matrix=confusion_mx, display_labels=['Negative', 'Positive'])
+        disp.plot()
         # Plot the Confusion Matrix for the threshold selected
-        ConfusionMatrixDisplay.from_predictions(y_true, y_pred)
         plt.title('Confusion Matrix')
         plt.savefig(out_file.replace('.pkl', '_confusion_matrix.png'))
         plt.close()
@@ -123,7 +124,7 @@ def score_sklearn(out_file, system_output):
     return confusion_mx, f1_scr, f_beta, precision, recall, sklearn_roc_auc_score
 
 
-def score(system_output: dict, thresholds: np.arange = np.arange(0, 1, 0.0001)) -> tuple[float | Any, Any, Any]:
+def score(system_output: dict, thresholds: np.arange = np.arange(0, 1, 0.0001)):
     """
     Calculate the performance metrics for a range of thresholds
     :param system_output: dictionary with the id as key and the label and score as values {<id>: [<label>,<score>] }
